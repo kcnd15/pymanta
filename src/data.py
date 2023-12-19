@@ -17,6 +17,8 @@ def get_biomarkers (file_name="biomarkers.csv", datadir="../data"):
 
     file_path = os.path.join(datadir, file_name)
 
-    biomarkers = np.genfromtxt(file_path, delimiter=";")
+    biomarkers_df = pd.read_csv(file_path, sep=";", decimal=",")
+    # biomarkers = np.genfromtxt(file_path, delimiter=";")
+    biomarkers = biomarkers_df.to_numpy()
 
     return biomarkers

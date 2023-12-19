@@ -1,6 +1,7 @@
 # usage.py
 
 from data import get_biomarkers, get_patients
+from manta import manta
 
 # library(manta)
 # manta2(biomarkers ~ ., data = patients)
@@ -24,5 +25,9 @@ biomarkers = get_biomarkers()
 patients = get_patients()
 
 print("Patients:\n", patients.head())
-print("Biomarkers:\n", biomarkers.shape)
+print("Biomarkers:\n", biomarkers.shape, "\n", biomarkers[0:4,:])
 
+# call MANTA
+manta(biomarkers=biomarkers, data=patients)
+
+pass
