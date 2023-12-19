@@ -21,13 +21,14 @@ from manta import manta
 # 4 observations deleted due to missingness
 
 # read toy test data
-biomarkers = get_biomarkers()
+biomarkers_df = get_biomarkers()
 patients = get_patients()
 
 print("Patients:\n", patients.head())
+biomarkers = biomarkers_df.to_numpy()
 print("Biomarkers:\n", biomarkers.shape, "\n", biomarkers[0:4,:])
 
 # call MANTA
-manta(biomarkers=biomarkers, data=patients)
+manta(biomarkers=biomarkers_df, data=patients)
 
 pass

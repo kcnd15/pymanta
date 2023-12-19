@@ -1,6 +1,7 @@
 # utils.py
 
 import numpy as np
+import sys
 
 
 def scale(
@@ -29,12 +30,42 @@ def scale(
     x = Y.copy()
 
     if center:
-        x -= x.mean()
+        # axis=None: The default is to compute the mean of the flattened array.
+        x_mean_columns = x.mean(axis=0)
+        x -= x_mean_columns
 
     if scale_flag and center:
-        x /= x.std()
+        # axis=None: The default is to compute the standard deviation of the flattened array.
+        x_std_columns = x.std(axis=0)
+        x /= x_std_columns
 
     elif scale_flag:
-        x /= np.sqrt(x.pow(2).sum().div(x.count() - 1))
+        x /= np.sqrt(x.pow(2).sum(axis=0).div(x.count() - 1))
 
     return x
+
+
+def stop(message: str):
+    print("Error:", message)
+    sys.exit(1)
+
+
+def match_arg(argument, valid_values: list, argument_name=None):
+    """
+    R function "match.arg" replacement
+    :param argument:
+    :param valid_values:
+    :param argument_name:
+    :return:
+    """
+    if argument in valid_values:
+        return argument
+    else:
+        if argument_name is None:
+            error_msg = f"Error: argument should be one of "
+        else:
+            error_msg = f"Error: {argument_name} should be one of "
+        error_msg += f"{str(valid_values)}, but is '{argument}'"
+
+        print(error_msg)
+        sys.exit(2)
