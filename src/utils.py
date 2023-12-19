@@ -69,3 +69,12 @@ def match_arg(argument, valid_values: list, argument_name=None):
 
         print(error_msg)
         sys.exit(2)
+
+
+def model_matrix(
+        object,
+        data, # = environment(object),
+        contrasts_arg = None, # NULL,
+        xlev = None # NULL
+    ):
+    pass

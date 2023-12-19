@@ -1,8 +1,13 @@
 # manta.py
 
 from utils import scale, stop, match_arg
+from manta_ss import manta_ss
+
 import numpy as np
 import pandas as pd
+
+from patsy.highlevel import dmatrix
+from sklearn import linear_model
 
 
 def manta(
@@ -62,6 +67,10 @@ def manta(
     # remove NaN
     mf = mf.dropna(axis="index")
 
+    # regressors dataframe containing age, gender, status
+    mf_regressors = mf.iloc[:, 5:]
+    mf_regressors.reset_index(inplace=True, drop=True)
+
     # convert Pandas dataframe biomarkers (first 5 columns) to a numpy array
     mf_biomarkers = mf.iloc[:, :5]
     response = mf_biomarkers.to_numpy()
@@ -109,17 +118,62 @@ def manta(
     # scale(x, center = TRUE, scale = TRUE)
     Y = scale(Y, center=True, scale_flag=False)
 
-
+    # replace the response matrix with the scaled response matrix
+    #     biomarkers.biomarker1 biomarkers.biomarker2 biomarkers.biomarker3 biomarkers.biomarker4 biomarkers.biomarker5 age gender  status
+    # 1            -1.481080791           0.504993185          -0.037885609          -1.077984302          -0.499770229  53   male    mild
+    # 2             0.618312159           0.089061220          -0.054001445          -5.480380440          -2.076717042  48 female healthy
+    # 4            -3.091349542           0.841460380           0.314062719          -6.236806048          -0.904607816  43 female healthy
+    # 5             0.832841917           0.082618173           0.478106085          -2.916215688          -1.127521745  58 female    mild
+    # 6             0.941639068           0.729765500           0.226014973          12.589108580          -1.808181583  68 female    mild
     # mf[[1L]] <- Y
+
+    Y_df = pd.DataFrame(Y)
+
+    mf = pd.concat([Y_df, mf_regressors], axis=1)
 
     # ------------------
     # Define contrasts
     # ------------------
+    #     if(is.null(contrasts)){
+    #     contrasts <- list(unordered = "contr.sum", ordered = "contr.poly")
+    #     -> $unordered [1] "contr.sum", $ordered [1] "contr.poly"
+    #     dc <- attr(mt, "dataClasses")[-1]
+    #     -> dc
+    #           age        gender    status
+    #           "numeric"  "factor"  "ordered"
+    #     contr.list <- lapply(dc, FUN = function(k){
+    #       # No contrast for quantitative predictors
+    #       # Sum contrasts for unordered categorical predictors
+    #       # Polynomial contrasts for ordered categorical predictors
+    #       contr.type <- switch(k, "factor" = contrasts$unordered,
+    #                            "ordered" = contrasts$ordered)
+    #       return(contr.type)
+    #     })
+    #     -> $age NULL, $gender [1] "contr.sum", $status [1] "contr.poly"
+    #     contr.list <- contr.list[!unlist(lapply(contr.list, is.null))]
+    #     -> $gender [1] "contr.sum", $status [1] "contr.poly"
+    #   } else {
+    #     contr.list <- contrasts
+    #   }
+
+    if contrasts is None:
+        contrasts = None
 
     # --------------------
     # Build model matrix
     # --------------------
     # X <- model.matrix(mt, mf, contr.list)
+    # ->
+    #     (Intercept) age gender1      status.L   status.Q
+    # 1             1  53      -1 -7.850462e-17 -0.8164966
+    # 2             1  48       1 -7.071068e-01  0.4082483
+    # 4             1  43       1 -7.071068e-01  0.4082483
+    # 5             1  58       1 -7.850462e-17 -0.8164966
+
+    age = mf["age"].to_list()
+    gender = mf["gender"].to_list()
+    status = mf["status"].to_list()
+    X = dmatrix("age + gender + status")
 
     # --------
     # Fit lm
@@ -136,6 +190,12 @@ def manta(
     #   lmfit$terms <- mt
     #   lmfit$model <- mf
 
+    # Create linear regression object
+    lmfit = linear_model.LinearRegression()
+
+    # Train the model using the training sets
+    lmfit.fit(X, Y)
+
     # ---------------------------------------------------------------------------------
     # Compute sums of squares, df's, pseudo-F statistics, partial R2s and eigenvalues
     # ---------------------------------------------------------------------------------
@@ -146,6 +206,8 @@ def manta(
     #   f.tilde <- stats$f.tilde
     #   r2 <- stats$r2
     #   e <- stats$e
+
+    stats = manta_ss(fit=lmfit, x=X, ss_type=ss_type, subset=subset)
 
     # ------------------
     # Compute P-values
