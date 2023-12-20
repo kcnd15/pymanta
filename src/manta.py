@@ -2,6 +2,7 @@
 
 from utils import scale, stop, match_arg
 from manta_ss import manta_ss
+from manta_results import MantaResults
 
 import pandas as pd
 
@@ -18,8 +19,6 @@ def manta(
         subset=None,
         fit=False
 ):
-    print("function manta")
-
     # --------
     # Checks
     # --------
@@ -235,16 +234,21 @@ def manta(
     #   stats <- manta2.ss(fit = lmfit, X = X, type = type, subset = subset)
     stats = manta_ss(fit=lmfit, x=X, ss_type=ss_type, subset=subset)
 
+    out = MantaResults()
+    out.set_sumofsquares_type(ss_type)
+
     #   SS <- stats$SS
     #  SS
     #       age    gender    status Residuals
     #  400.6299   34.2810 2152.6636 4955.7163
     SS = stats["SS"]
+    out.setResiduals(SS)
 
     #   df <- stats$df
     # df
     #       age    gender    status Residuals
     #         1         1         2        91
+    out.set_df_residuals(stats["df_e"])
 
     #   f.tilde <- stats$f.tilde
     # f.tilde
@@ -360,4 +364,4 @@ def manta(
 
     #   return(out)
 
-    pass
+    return out

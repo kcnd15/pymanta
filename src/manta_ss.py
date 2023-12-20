@@ -1,6 +1,7 @@
 # manta_ss.py
 
 import numpy as np
+from utils import crossproduct
 
 
 def manta_ss(
@@ -40,7 +41,9 @@ def manta_ss(
     # 5             1  58       1 -7.850462e-17 -0.8164966
     # 6             1  68       1 -7.850462e-17 -0.8164966
 
-    ## Residual sum-of-squares and cross-products (SSCP) matrix
+    # ----------------------------------------------------------
+    # Residual sum-of-squares and cross-products (SSCP) matrix
+    # ----------------------------------------------------------
     # fit$residuals: (96,5)
     # lmfit$residuals
     #      biomarker1   biomarker2   biomarker3  biomarker4   biomarker5
@@ -61,36 +64,61 @@ def manta_ss(
     # biomarker4 -151.7296104 -49.288261 -19.8440518 3472.66720 -299.2267528
     # biomarker5  -52.8805334  25.058075   0.2067679 -299.22675 1221.5848102
 
-    SSCP_e = fit_residuals.transpose().dot(fit_residuals)
+    SSCP_e = crossproduct(fit_residuals) # fit_residuals.transpose().dot(fit_residuals)
 
-    ## Residual sum-of-squares and df
+    # --------------------------------
+    # Residual sum-of-squares and df
+    # --------------------------------
     # SS.e <- sum(diag(SSCP.e)) -> 4955.716
     SS_e = np.sum(SSCP_e.diagonal())
 
     # df.e <- fit$df.residual # df.e <- (n-1) - sum(df) -> 91
+    df_e = fit.df_resid
 
-    ## Total sum-of-squares
+    # ----------------------
+    # Total sum-of-squares
+    # ----------------------
     # SS.t <- sum(diag(crossprod(fit$model[[1L]]))) -> 9444.429
+    # fit$model[[1L]]:
+    #       biomarker1   biomarker2   biomarker3   biomarker4 biomarker5
+    # 1   -1.481080791  0.504993185 -0.037885609  -1.07798430 -0.4997702
+    # 2    0.618312159  0.089061220 -0.054001445  -5.48038044 -2.0767170
+    # 4   -3.091349542  0.841460380  0.314062719  -6.23680605 -0.9046078
+    # 5    0.832841917  0.082618173  0.478106085  -2.91621569 -1.1275217
+    # 6    0.941639068  0.729765500  0.226014973  12.58910858 -1.8081816
+    fit_model = fit.model.endog
+    SS_t = np.sum(crossproduct(fit_model).diagonal())
 
-    ## Partial sums-of-squares
+    # -------------------------
+    # Partial sums-of-squares
+    # -------------------------
     # terms <- attr(fit$terms, "term.labels") # Model terms
+    # terms
+    # [1] "age"    "gender" "status"
+
     # n.terms <- length(terms)
+    # n.terms: 3
 
     # if(!is.null(subset)) {
     #   if(all(subset %in% terms)) {
     #     iterms <- which(terms %in% subset)
-    #   }else {
+    #   } else {
     #    stop(sprintf("Unknown terms in subset: %s",
     #    paste0("'", subset[which(! subset %in% terms)], "'",
     #    collapse = ", ")))
     #   }
     #   } else {
     #   iterms <- 1:n.terms
+    #   -> iterms 1 2 3
     # }
     # asgn <- fit$assign
+    # asgn: 0 1 2 3 3
 
     # df <- SS <- numeric(n.terms) # Initialize empty
+    # -> df, SS: 0 0 0
+
     # names(df) <- names(SS) <- terms
+    # -> names(df), names(SS): "age", "gender", "status"
 
     # if (type == "I"){
     #
@@ -103,10 +131,9 @@ def manta_ss(
     # }
     #
     # } else {
-    #
-    # sscp <- function(L, B, V){
-    # LB <- L %*% B
-    # crossprod(LB, solve(L %*% tcrossprod(V, L), LB))
+    #   sscp <- function(L, B, V){
+    #   LB <- L %*% B
+    #   crossprod(LB, solve(L %*% tcrossprod(V, L), LB))
     # }
 
     # B <- fit$coefficients     # Coefficients
@@ -130,29 +157,29 @@ def manta_ss(
     # } else {
     #
     # is.relative <- function(term1, term2, factors) {
-    # all( !( factors[, term1] & ( !factors[, term2] ) ) )
+    #   all( !( factors[, term1] & ( !factors[, term2] ) ) )
     # }
 
     # fac <- attr(fit$terms, "factors")
-    # for (i in iterms){
-    # term <- terms[i]
-    # subs.term <- which(asgn == i)
-    # if(n.terms > 1) { # Obtain relatives
-    # relatives <- (1:n.terms)[-i][sapply(terms[-i],
+    # for (i in iterms) {
+    #   term <- terms[i]
+    #   subs.term <- which(asgn == i)
+    #   if(n.terms > 1) { # Obtain relatives
+    #   relatives <- (1:n.terms)[-i][sapply(terms[-i],
     #                                    function(term2)
     #                                    is.relative(term, term2, fac))]
     # } else {
     #    relatives <- NULL
     # }
     # subs.relatives <- NULL
-    # for (relative in relatives){
+    # for (relative in relatives) {
     #    subs.relatives <- c(subs.relatives, which(asgn == relative))
     # }
     # L1 <- I.p[subs.relatives, , drop = FALSE] # Hyp. matrix (relatives)
     # if (length(subs.relatives) == 0) {
     #  SSCP1 <- 0
     #  } else {
-    # SSCP1 <- sscp(L1, B, V)
+    #    SSCP1 <- sscp(L1, B, V)
     # }
     # L2 <- I.p[c(subs.relatives, subs.term), , drop = FALSE] # Hyp. matrix (relatives + term)
     # SSCP2 <- sscp(L2, B, V)
@@ -162,31 +189,70 @@ def manta_ss(
     # }
     # }
 
-    ## subset
+    # --------
+    # subset
+    # --------
     # if(!is.null(subset)){
     #  SS <- SS[iterms]
     #  df <- df[iterms]
     # }
 
-    ## pseudo-F
-    # f.tilde <- SS/SS.e*df.e/df
+    # SS
+    #       age    gender    status
+    #  400.6299   34.2810 2152.6636
+    # SS.e: 4955.716, SS.t: 9444.429
+    # df
+    #    age gender status
+    #      1      1      2
+    # df.e: 91
 
-    ## r.squared
+    # ----------
+    # pseudo-F
+    # ----------
+    # f.tilde <- SS/SS.e*df.e/df
+    # f.tilde
+    #        age     gender     status
+    #  7.3566195  0.6294894 19.7642858
+
+    # -----------
+    # r.squared
+    # -----------
     # R2 <- (SS.t - SS.e)/SS.t
+    # SS.t: 9444.429, SS.e: 4955.716
+    # R2: 0.4752762
+    R2 = (SS_t - SS_e) / SS_t
+    pass
+
     # R2adj <- 1-( (1-R2)*(n-1) / df.e )
+    # n:
+
     # r2 <- SS/SS.t
+    # r2
+    #         age      gender      status
+    # 0.042419706 0.003629759 0.227929469
+
     # r2adj <- 1-( (1-r2)*(n-1) / df.e )
 
     # Get eigenvalues from cov(R)*(n-1)/df.e
     # e <- eigen(SSCP.e/df.e, symmetric = T, only.values = T)$values
+    # e
+    # [1] 38.66849176 13.05510597  2.00150461  0.66820365  0.06511482
+
     # e <- e[e/sum(e) > tol]
+    # e
+    # [1] 38.66849176 13.05510597  2.00150461  0.66820365  0.06511482
+
+    # ------------------
+    # result structure
+    # ------------------
 
     # return(list("SS" = c(SS, "Residuals" = SS.e),
     # "df" = c(df, "Residuals" = df.e),
     # "f.tilde" = f.tilde, "r2" = r2, "e" = e))
 
     result_dict = {
-        "SS": SS_e
+        "SS": SS_e,
+        "df_e": df_e,
     }
 
     return result_dict

@@ -78,3 +78,13 @@ def model_matrix(
         xlev = None # NULL
     ):
     pass
+
+def crossproduct(matrix):
+    """
+    calculate the crossproduct of a matrix T =  T'T
+    :param matrix: matrix
+    :return: crossproduct
+    """
+
+    cp = matrix.transpose().dot(matrix)
+    return cp

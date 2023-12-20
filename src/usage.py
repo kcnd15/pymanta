@@ -3,6 +3,7 @@
 from data import get_biomarkers, get_patients
 from manta import manta
 
+
 # library(manta)
 # manta2(biomarkers ~ ., data = patients)
 #
@@ -29,6 +30,7 @@ biomarkers = biomarkers_df.to_numpy()
 print("Biomarkers:\n", biomarkers.shape, "\n", biomarkers[0:4,:])
 
 # call MANTA
-manta(biomarkers=biomarkers_df, data=patients)
+print("\ncalling manta...\n")
+manta_result = manta(biomarkers=biomarkers_df, data=patients)
 
-pass
+print(manta_result)
