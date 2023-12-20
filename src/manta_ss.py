@@ -6,15 +6,17 @@ from utils import crossproduct
 
 def manta_ss(
         fit,
-        x,
-        ss_type="II",
+        X,
+        regressor_columns: list,
+        ss_type: str = "II",
         subset=None,
-        tol=1e-3
+        tol=1e-3,
     ):
     """
     MANTA sum of squares
     :param fit: fitted linear regression model
-    :param x: predictors
+    :param X: predictors
+    :param regressor_columns: list with names of regressor columns
     :param ss_type: sum of squares type
     :param subset:
     :param tol:
@@ -94,10 +96,12 @@ def manta_ss(
     # -------------------------
     # terms <- attr(fit$terms, "term.labels") # Model terms
     # terms
-    # [1] "age"    "gender" "status"
+    # [1] "age" "gender" "status"
+    terms = regressor_columns
 
     # n.terms <- length(terms)
     # n.terms: 3
+    n_terms = len(terms)
 
     # if(!is.null(subset)) {
     #   if(all(subset %in% terms)) {
@@ -107,12 +111,17 @@ def manta_ss(
     #    paste0("'", subset[which(! subset %in% terms)], "'",
     #    collapse = ", ")))
     #   }
-    #   } else {
+    # } else {
     #   iterms <- 1:n.terms
     #   -> iterms 1 2 3
     # }
     # asgn <- fit$assign
     # asgn: 0 1 2 3 3
+
+    if (subset is not None):
+        iterms = None
+    else:
+        iterms = range(0, n_terms)
 
     # df <- SS <- numeric(n.terms) # Initialize empty
     # -> df, SS: 0 0 0
@@ -120,81 +129,143 @@ def manta_ss(
     # names(df) <- names(SS) <- terms
     # -> names(df), names(SS): "age", "gender", "status"
 
-    # if (type == "I"){
+    # if (type == "I") {
     #
-    # effects <- as.matrix(fit$effects)[seq_along(asgn), , drop = FALSE]
+    #   effects <- as.matrix(fit$effects)[seq_along(asgn), , drop = FALSE]
     #
-    # for (i in iterms) {
-    #  subs <- which(asgn == i)
-    #  SS[i] <- sum(diag(crossprod(effects[subs, , drop = FALSE])))
-    #  df[i] <- length(subs)
-    # }
-    #
-    # } else {
-    #   sscp <- function(L, B, V){
-    #   LB <- L %*% B
-    #   crossprod(LB, solve(L %*% tcrossprod(V, L), LB))
-    # }
-
-    # B <- fit$coefficients     # Coefficients
-    # V <- solve(crossprod(X))  # V = (X'X)^{-1}
-    # p <- nrow(B)
-    # I.p <- diag(p)
-
-    # In contrast to car::Anova, intercept
-    # information is not returned for
-    # type III sums-of-squares
-
-    # if (type == "III"){
-    #
-    # for (i in iterms){
-    #   subs <- which(asgn == i)
-    #   L <- I.p[subs, , drop = FALSE] # Hypothesis matrix
-    #   SS[i] <- sum(diag(sscp(L, B, V)))
-    #   df[i] <- length(subs)
-    # }
+    #   for (i in iterms) {
+    #       subs <- which(asgn == i)
+    #       SS[i] <- sum(diag(crossprod(effects[subs, , drop = FALSE])))
+    #       df[i] <- length(subs)
+    #   }
     #
     # } else {
-    #
-    # is.relative <- function(term1, term2, factors) {
-    #   all( !( factors[, term1] & ( !factors[, term2] ) ) )
-    # }
+    #   sscp <- function(L, B, V) {
+    #       LB <- L %*% B
+    #       crossprod(LB, solve(L %*% tcrossprod(V, L), LB))
+    #   }
 
-    # fac <- attr(fit$terms, "factors")
-    # for (i in iterms) {
-    #   term <- terms[i]
-    #   subs.term <- which(asgn == i)
-    #   if(n.terms > 1) { # Obtain relatives
-    #   relatives <- (1:n.terms)[-i][sapply(terms[-i],
+    if ss_type == "I":
+        pass
+    else:
+        pass
+
+    #   B <- fit$coefficients     # Coefficients
+    #   ->              biomarker1  biomarker2   biomarker3  biomarker4 biomarker5
+    # (Intercept) -0.49025049 -1.19548036  0.124428353 -24.4062818 -0.3600481
+    # age          0.00529589  0.01949775 -0.002838998   0.4094594  0.1334645
+    # gender1      0.07256393  0.01608482  0.016514937  -0.4505664  0.3957010
+    # status.L    -0.65077518 -0.53761407  0.017901769  -7.4342467 15.3203131
+    # status.Q    -0.07236788 -0.14051561 -0.163548569  -6.0984142  9.9230951
+
+    B = fit.params
+
+    cp_X = crossproduct(X)
+    V = np.linalg.inv(cp_X)
+
+    #   V <- solve(crossprod(X))  # V = (X'X)^{-1}
+    #
+    # crossprod(X)
+    #             (Intercept)        age     gender1    status.L     status.Q
+    # (Intercept)    96.00000   4933.000    0.000000   -30.40559   -15.921683
+    # age          4933.00000 263209.000 -105.000000 -1219.05209 -1152.076676
+    # gender1         0.00000   -105.000   96.000000    -2.12132    -1.224745
+    # status.L      -30.40559  -1219.052   -2.121320    25.50000   -12.413031
+    # status.Q      -15.92168  -1152.077   -1.224745   -12.41303    38.500000
+    #
+    # V
+    #             (Intercept)           age       gender1     status.L     status.Q
+    # (Intercept)  1.67592425 -0.0276108447 -0.0128674475  0.726270244  0.100602093
+    # age         -0.02761084  0.0004639845  0.0002431591 -0.011288694 -0.001166091
+    # gender1     -0.01286745  0.0002431591  0.0106585695 -0.002034276  0.001638155
+    # status.L     0.72627024 -0.0112886940 -0.0020342763  0.411721845  0.095226706
+    # status.Q     0.10060209 -0.0011660910  0.0016381554  0.095226706  0.063438617
+
+    #   p <- nrow(B) -> 5
+    rows_B, cols_B = np.shape(B)
+    p = rows_B
+
+    #   I.p <- diag(p)
+    I_p = np.identity(p)
+    pass
+
+    # I.p
+    #      [,1] [,2] [,3] [,4] [,5]
+    # [1,]    1    0    0    0    0
+    # [2,]    0    1    0    0    0
+    # [3,]    0    0    1    0    0
+    # [4,]    0    0    0    1    0
+    # [5,]    0    0    0    0    1
+
+    #   In contrast to car::Anova, intercept
+    #   information is not returned for
+    #   type III sums-of-squares
+
+    #   if (type == "III"){
+    #
+    #       for (i in iterms){
+    #           subs <- which(asgn == i)
+    #           L <- I.p[subs, , drop = FALSE] # Hypothesis matrix
+    #           SS[i] <- sum(diag(sscp(L, B, V)))
+    #           df[i] <- length(subs)
+    #       }
+    #
+    if ss_type == "III":
+        pass
+    else:
+        pass
+
+        def is_relative(term1, term2, factors):
+            return False
+    #   } else {
+    #
+    #       is.relative <- function(term1, term2, factors) {
+    #           all( !( factors[, term1] & ( !factors[, term2] ) ) )
+    #       }
+
+    #       fac <- attr(fit$terms, "factors")
+    # -> fac
+    #            age gender status
+    # biomarkers   0      0      0
+    # age          1      0      0
+    # gender       0      1      0
+    # status       0      0      1
+    #
+    #       for (i in iterms) {
+    #           term <- terms[i]
+    #           subs.term <- which(asgn == i)
+    #           if(n.terms > 1) { # Obtain relatives
+    #           relatives <- (1:n.terms)[-i][sapply(terms[-i],
     #                                    function(term2)
     #                                    is.relative(term, term2, fac))]
-    # } else {
-    #    relatives <- NULL
-    # }
-    # subs.relatives <- NULL
-    # for (relative in relatives) {
-    #    subs.relatives <- c(subs.relatives, which(asgn == relative))
-    # }
-    # L1 <- I.p[subs.relatives, , drop = FALSE] # Hyp. matrix (relatives)
-    # if (length(subs.relatives) == 0) {
-    #  SSCP1 <- 0
-    #  } else {
-    #    SSCP1 <- sscp(L1, B, V)
-    # }
-    # L2 <- I.p[c(subs.relatives, subs.term), , drop = FALSE] # Hyp. matrix (relatives + term)
-    # SSCP2 <- sscp(L2, B, V)
-    # SS[i] <- sum(diag(SSCP2 - SSCP1))
-    # df[i] <- length(subs.term)
-    # }
-    # }
-    # }
+    #       } else {
+    #           relatives <- NULL
+    #       }
+    #       subs.relatives <- NULL
+    #       for (relative in relatives) {
+    #           subs.relatives <- c(subs.relatives, which(asgn == relative))
+    #       }
+    #       L1 <- I.p[subs.relatives, , drop = FALSE] # Hyp. matrix (relatives)
+    #       if (length(subs.relatives) == 0) {
+    #           SSCP1 <- 0
+    #       } else {
+    #           SSCP1 <- sscp(L1, B, V)
+    #       }
+    #
+    #       L2 <- I.p[c(subs.relatives, subs.term), , drop = FALSE] # Hyp. matrix (relatives + term)
+    #       SSCP2 <- sscp(L2, B, V)
+    #       SS[i] <- sum(diag(SSCP2 - SSCP1))
+    #       df[i] <- length(subs.term)
+    #       }
+    #   }
+    # } # end else
 
     # --------
     # subset
     # --------
     # if(!is.null(subset)){
-    #  SS <- SS[iterms]
-    #  df <- df[iterms]
+    #   SS <- SS[iterms]
+    #   df <- df[iterms]
     # }
 
     # SS

@@ -232,7 +232,8 @@ def manta(
     # ---------------------------------------------------------------------------------
 
     #   stats <- manta2.ss(fit = lmfit, X = X, type = type, subset = subset)
-    stats = manta_ss(fit=lmfit, x=X, ss_type=ss_type, subset=subset)
+    regressor_columns=mf_regressors.columns.to_list()
+    stats = manta_ss(fit=lmfit, X=X, ss_type=ss_type, subset=subset, regressor_columns=regressor_columns)
 
     out = MantaResults()
     out.set_sumofsquares_type(ss_type)
