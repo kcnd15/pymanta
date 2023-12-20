@@ -3,11 +3,10 @@
 from utils import scale, stop, match_arg
 from manta_ss import manta_ss
 
-import numpy as np
 import pandas as pd
 
 from patsy.highlevel import dmatrix
-from sklearn import linear_model
+import statsmodels.api as sm
 
 
 def manta(
@@ -163,7 +162,7 @@ def manta(
     # Build model matrix
     # --------------------
     # X <- model.matrix(mt, mf, contr.list)
-    # ->
+    # -> (96,5)
     #     (Intercept) age gender1      status.L   status.Q
     # 1             1  53      -1 -7.850462e-17 -0.8164966
     # 2             1  48       1 -7.071068e-01  0.4082483
@@ -190,37 +189,175 @@ def manta(
     #   lmfit$terms <- mt
     #   lmfit$model <- mf
 
-    # Create linear regression object
-    lmfit = linear_model.LinearRegression()
+    # lmfit:
+    # $coefficients
+    #              biomarker1  biomarker2   biomarker3  biomarker4 biomarker5
+    # (Intercept) -0.49025049 -1.19548036  0.124428353 -24.4062818 -0.3600481
+    # age          0.00529589  0.01949775 -0.002838998   0.4094594  0.1334645
+    # gender1      0.07256393  0.01608482  0.016514937  -0.4505664  0.3957010
+    # status.L    -0.65077518 -0.53761407  0.017901769  -7.4342467 15.3203131
+    # status.Q    -0.07236788 -0.14051561 -0.163548569  -6.0984142  9.9230951
+    #
+    # $residuals
+    #      biomarker1   biomarker2   biomarker3  biomarker4   biomarker5
+    # 1   -1.25803666  0.568447153 -0.128868984  -3.8029530   1.28453576
+    # 2    0.35117254  0.009779514  0.020754049  -3.0447239  -1.73665335
+    # 4   -3.33200972  0.859667419  0.374623224  -1.7538523   0.10277818
+    # 5    0.88427874  0.016413759  0.368287825  -6.7873487  -0.80194012
+    # 6    0.94011700  0.468583595  0.144586692   4.6233813  -2.81724456
+    #
+    # $fitted.values
+    #      biomarker1  biomarker2  biomarker3 biomarker4 biomarker5
+    # 1   -0.22304413 -0.06345397  0.09098338  2.7249687 -1.7843060
+    # 2    0.26713962  0.07928171 -0.07475549 -2.4356566 -0.3400637
+    # 4    0.24066017 -0.01820704 -0.06056050 -4.4829537 -1.0073860
+    # 5   -0.05143683  0.06620441  0.10981826  3.8711330 -0.3255816
+    # 6    0.00152207  0.26118190  0.08142828  7.9657273  1.0090630
+    #
+    # Call:
+    # lm(formula = biomarkers ~ ., data = patients, contrasts = contr.list)
+    #
+    # Coefficients:
+    #              biomarker1  biomarker2  biomarker3  biomarker4  biomarker5
+    # (Intercept)   -0.490250   -1.195480    0.124428  -24.406282   -0.360048
+    # age            0.005296    0.019498   -0.002839    0.409459    0.133464
+    # gender1        0.072564    0.016085    0.016515   -0.450566    0.395701
+    # status.L      -0.650775   -0.537614    0.017902   -7.434247   15.320313
+    # status.Q      -0.072368   -0.140516   -0.163549   -6.098414    9.923095
 
-    # Train the model using the training sets
-    lmfit.fit(X, Y)
+    # fit linear regression model with statsmodels
+    lmfit = sm.OLS(Y, X).fit()
 
     # ---------------------------------------------------------------------------------
     # Compute sums of squares, df's, pseudo-F statistics, partial R2s and eigenvalues
     # ---------------------------------------------------------------------------------
 
     #   stats <- manta2.ss(fit = lmfit, X = X, type = type, subset = subset)
-    #   SS <- stats$SS
-    #   df <- stats$df
-    #   f.tilde <- stats$f.tilde
-    #   r2 <- stats$r2
-    #   e <- stats$e
-
     stats = manta_ss(fit=lmfit, x=X, ss_type=ss_type, subset=subset)
+
+    #   SS <- stats$SS
+    #  SS
+    #       age    gender    status Residuals
+    #  400.6299   34.2810 2152.6636 4955.7163
+    SS = stats["SS"]
+
+    #   df <- stats$df
+    # df
+    #       age    gender    status Residuals
+    #         1         1         2        91
+
+    #   f.tilde <- stats$f.tilde
+    # f.tilde
+    #        age     gender     status
+    #  7.3566195  0.6294894 19.7642858
+
+    #   r2 <- stats$r2
+    # r2
+    #         age      gender      status
+    # 0.042419706 0.003629759 0.227929469
+
+    #   e <- stats$e
+    # e
+    # [1] 38.66849176 13.05510597  2.00150461  0.66820365  0.06511482
 
     # ------------------
     # Compute P-values
     # ------------------
     #   l <- length(df) # SS[l], df[l] correspond to Residuals
+    # -> 4L
+
     #   pv.acc <- mapply(p.asympt, ss = SS[-l], df = df[-l], MoreArgs = list(lambda = e))
+    # pv.acc
+    #               age       gender       status
+    # [1,] 1.684575e-03 5.143919e-01 1.296629e-12
+    # [2,] 1.000000e-14 1.000000e-14 1.000000e-14
 
     # -------------
     # ANOVA table
     # -------------
+    # stats.l <- list(df, SS, SS/df, f.tilde, r2, pv.acc[1, ])
+    #   cmat <- data.frame()
+    #   for(i in seq(along = stats.l)) {
+    #     for(j in names(stats.l[[i]])){
+    #       cmat[j, i] <- stats.l[[i]][j]
+    #     }
+    #   }
+    #   cmat <- as.matrix(cmat)
+    # cmat
+    #           V1        V2         V3         V4          V5           V6
+    # age        1  400.6299  400.62988  7.3566195 0.042419706 1.684575e-03
+    # gender     1   34.2810   34.28100  0.6294894 0.003629759 5.143919e-01
+    # status     2 2152.6636 1076.33179 19.7642858 0.227929469 1.296629e-12
+    # Residuals 91 4955.7163   54.45842         NA          NA           NA
+
+    #   colnames(cmat) <- c("Df", "Sum Sq", "Mean Sq", "F value", "R2", "Pr(>F)")
+    # cmat
+    #           Df    Sum Sq    Mean Sq    F value          R2       Pr(>F)
+    # age        1  400.6299  400.62988  7.3566195 0.042419706 1.684575e-03
+    # gender     1   34.2810   34.28100  0.6294894 0.003629759 5.143919e-01
+    # status     2 2152.6636 1076.33179 19.7642858 0.227929469 1.296629e-12
+    # Residuals 91 4955.7163   54.45842         NA          NA           NA
 
     # --------
     # Output
     # --------
+    # out <- list("call" = cl,
+    #               "aov.tab" = cmat,
+    #               "type" = type,
+    #               "precision" = pv.acc[2, ],
+    #               "transform" = transform,
+    #               "na.omit" = lmfit$na.action)
+    # out
+    # $call
+    # manta2(formula = biomarkers ~ ., data = patients)
+    #
+    # $aov.tab
+    #           Df    Sum Sq    Mean Sq    F value          R2       Pr(>F)
+    # age        1  400.6299  400.62988  7.3566195 0.042419706 1.684575e-03
+    # gender     1   34.2810   34.28100  0.6294894 0.003629759 5.143919e-01
+    # status     2 2152.6636 1076.33179 19.7642858 0.227929469 1.296629e-12
+    # Residuals 91 4955.7163   54.45842         NA          NA           NA
+    #
+    # $type
+    # [1] "II"
+    #
+    # $precision
+    #    age gender status
+    #  1e-14  1e-14  1e-14
+    #
+    # $transform
+    # [1] "none"
+    #
+    # $na.omit
+    #  3 47 64 96
+    #  3 47 64 96
+    # attr(,"class")
+    # [1] "omit"
+
+    #   if(fit){
+    #     out$fit <- lmfit
+    #   }
+    # fit is FALSE
+
+    #   ## Update class
+    #   class(out) <- c('manta', class(out))
+    #
+    # out:
+    #
+    # Call:
+    # manta2(formula = biomarkers ~ ., data = patients)
+    #
+    # Type II Sum of Squares
+    #
+    #           Df Sum Sq Mean Sq F value      R2    Pr(>F)
+    # age        1  400.6  400.63  7.3566 0.04242  0.001685 **
+    # gender     1   34.3   34.28  0.6295 0.00363    0.5144
+    # status     2 2152.7 1076.33 19.7643 0.22793 1.297e-12 ***
+    # Residuals 91 4955.7   54.46
+    # ---
+    # Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+    # 4 observations deleted due to missingness
+
+    #   return(out)
 
     pass
